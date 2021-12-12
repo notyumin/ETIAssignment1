@@ -34,6 +34,7 @@ type Trip struct {
 	DriverId      int
 	PickUpPostal  int
 	DropOffPostal int
+	Status        string
 }
 
 var passengerUrl string = "http://localhost:5000/passengers"
@@ -54,8 +55,8 @@ menu:
 		fmt.Println("Welcome to HytchHyke!")
 		fmt.Println("[1] Login as Passenger")
 		fmt.Println("[2] Login as Driver")
-		fmt.Println("[3] Create Passenger Account")
-		fmt.Println("[4] Create Driver Account")
+		fmt.Println("[3] Register Passenger Account")
+		fmt.Println("[4] Register Driver Account")
 		fmt.Println("[0] Quit")
 
 		userOption := getStrInput()
@@ -63,7 +64,11 @@ menu:
 		case "1":
 			loginPassenger()
 		case "2":
-			//loginDriver()
+			loginDriver()
+		case "3":
+			registerPassenger()
+		case "4":
+			registerDriver()
 		case "0":
 			break menu
 		default:
@@ -77,6 +82,34 @@ menu:
 //      Passenger      //
 //                     //
 /////////////////////////
+
+func registerPassenger() {
+	fmt.Print("First Name: ")
+	firstName := getStrInput()
+
+	fmt.Print("Last Name: ")
+	lastName := getStrInput()
+
+	fmt.Print("Mobile Number: ")
+	mobileNo := getIntInput()
+
+	fmt.Print("Email: ")
+	email := getStrInput()
+
+	newPassenger := Passenger{
+		FirstName: firstName,
+		LastName:  lastName,
+		MobileNo:  mobileNo,
+		Email:     email,
+	}
+
+	err := createPassenger(newPassenger)
+	if err != nil {
+		fmt.Println("Error: ", err.Error())
+	} else {
+		fmt.Println("Passenger Created Successfully!")
+	}
+}
 
 func loginPassenger() {
 login:
@@ -146,11 +179,17 @@ func bookTrip(passenger Passenger) {
 
 func displayPassengerTrip(passenger Passenger) {
 	trips := getPassengerTrips(passenger.Id)
-	for _, trip := range trips {
-		fmt.Println("\nPick Up Postal Code: ", trip.PickUpPostal)
+
+	//display in reverse chronological order
+	for i := len(trips) - 1; i >= 0; i-- {
+		trip := trips[i]
+		fmt.Println("\nTrip ID: ", trip.Id)
+		fmt.Println("Pick Up Postal Code: ", trip.PickUpPostal)
 		fmt.Println("Drop Off Postal Code: ", trip.DropOffPostal)
 		fmt.Println("Driver ID: ", trip.DriverId)
 		fmt.Println("Passenger ID: ", trip.PassengerId)
+		fmt.Println("Trip Status", trip.Status)
+		fmt.Println()
 	}
 }
 
@@ -188,6 +227,38 @@ func updatePassengerDetails(passenger Passenger) {
 //       Driver        //
 //                     //
 /////////////////////////
+
+func registerDriver() {
+	fmt.Print("First Name: ")
+	firstName := getStrInput()
+
+	fmt.Print("Last Name: ")
+	lastName := getStrInput()
+
+	fmt.Print("Mobile Number: ")
+	mobileNo := getIntInput()
+
+	fmt.Print("Email: ")
+	email := getStrInput()
+
+	fmt.Print("Car Licence Plate Number: ")
+	carLicenseNo := getStrInput()
+
+	newDriver := Driver{
+		FirstName:    firstName,
+		LastName:     lastName,
+		MobileNo:     mobileNo,
+		Email:        email,
+		CarLicenseNo: carLicenseNo,
+	}
+
+	err := createDriver(newDriver)
+	if err != nil {
+		fmt.Println("Error: ", err.Error())
+	} else {
+		fmt.Println("Driver Registered Successfully!")
+	}
+}
 
 func loginDriver() {
 login:
@@ -259,9 +330,54 @@ func updateDriverDetails(driver Driver) {
 	if err != nil {
 		fmt.Println("Error: ", err.Error())
 	} else {
-		fmt.Println("Passenger Updated Successfully!")
+		fmt.Println("Driver Updated Successfully!")
 		fmt.Println("Please log in again")
 	}
+}
+
+func startTrip(driver Driver) {
+	//get all trips
+	//update trip where driver_id = driver.id && status == "waiting"
+	//into status = "driving"
+
+	driverTrips := getDriverTrips(driver.Id)
+	var waitingTrip Trip
+	for _, trip := range driverTrips {
+		if trip.Status == "waiting" {
+			waitingTrip = trip
+		}
+	}
+	if (waitingTrip == Trip{}) {
+		fmt.Println("No waiting trips")
+	} else {
+		waitingTrip.Status = "driving"
+		updateTrip(waitingTrip)
+		fmt.Println("\nTrip started")
+	}
+}
+
+func endTrip(driver Driver) {
+	//update db where driver_id = driver.id && status == "driving"
+	//into status = "finish"
+	//update driver available to true
+	driverTrips := getDriverTrips(driver.Id)
+	var drivingTrip Trip
+	for _, trip := range driverTrips {
+		if trip.Status == "driving" {
+			drivingTrip = trip
+		}
+	}
+	if (drivingTrip == Trip{}) {
+		fmt.Println("No driving trips")
+	} else {
+		drivingTrip.Status = "finished"
+		updateTrip(drivingTrip)
+		fmt.Println("\nTrip ended")
+	}
+
+	//set driver to available
+	driver.Available = true
+	updateDriver(driver)
 }
 
 /////////////////////////
@@ -313,7 +429,7 @@ func getAvailableDriver() Driver {
 
 	var listDriver []Driver
 	json.NewDecoder(resp.Body).Decode(&listDriver)
-	if len(listDriver) >= 0 {
+	if len(listDriver) <= 0 {
 		return driver
 	}
 	driver = listDriver[0]
@@ -385,6 +501,41 @@ func updatePassenger(newPassenger Passenger) error {
 	url := fmt.Sprintf("%s/%d", passengerUrl, newPassenger.Id)
 
 	_, err := httpPut(url, newPassenger)
+	return err
+}
+
+func createPassenger(newPassenger Passenger) error {
+	url := passengerUrl
+	_, err := httpPost(url, newPassenger)
+	return err
+}
+
+func createDriver(newDriver Driver) error {
+	url := driverUrl
+
+	_, err := httpPost(url, newDriver)
+	return err
+}
+
+func getDriverTrips(id int) []Trip {
+	var trips []Trip
+
+	url := fmt.Sprintf("%s?driverId=%d", tripUrl, id)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Println("Error: ", err.Error())
+		return trips
+	}
+
+	json.NewDecoder(resp.Body).Decode(&trips)
+	return trips
+}
+
+func updateTrip(newTrip Trip) error {
+	url := fmt.Sprintf("%s/%d", tripUrl, newTrip.Id)
+
+	_, err := httpPut(url, newTrip)
 	return err
 }
 
