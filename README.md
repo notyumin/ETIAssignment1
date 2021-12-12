@@ -21,7 +21,7 @@ The second consideration was that microservices have to be loosely coupled. In f
 The third consideration was that the microservices should be easily testable, meaning minimizing on side effects within the code which makes testing extremely difficult. Thus, none of HytchHyke's microservice functions contain any unknown side effects. Each function performs what it is clearly stated to do, and nothing more.
 
 ## Backend Set Up
-Please refer to the `backend/README.md` file.
+Please refer to the [backend/README.md](https://github.com/notyumin/ETIAssignment1/blob/main/backend/README.md) file.
 
 ## Frontend Set up
 > Note: Make sure backend is running!
